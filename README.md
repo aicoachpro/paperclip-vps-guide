@@ -1,125 +1,262 @@
-# Paperclip VPS Setup Guide
+# Paperclip auf einem VPS installieren — Anleitung fuer Anfaenger
 
-Komplette Anleitung: Paperclip AI-Agent-Plattform auf einem VPS einrichten, mit Claude Code (Max-Abo) verbinden und produktionsreif konfigurieren.
+Diese Anleitung erklaert dir **Schritt fuer Schritt**, wie du Paperclip auf einem eigenen Server im Internet installierst. Du brauchst keine Vorkenntnisse — nur einen Computer und etwas Geduld.
 
-## Was ist Paperclip?
+---
 
-Paperclip ist eine Open-Source-Plattform zur Orchestrierung von KI-Agenten. Statt einzelne Chatbots zu bedienen, verwaltest du ein virtuelles Unternehmen mit Organigramm, Hierarchien, Budgets und Aufgaben. Ein CEO-Agent kann eigenstaendig Mitarbeiter einstellen, Tasks delegieren und Ergebnisse liefern.
+## Was bauen wir hier eigentlich?
 
+**Paperclip** ist eine Plattform, die KI-Agenten organisiert wie ein Unternehmen. Stell dir vor, du gruendest eine Firma, aber statt Menschen stellst du KI-Mitarbeiter ein:
+
+- Ein **CEO-Agent** leitet die Firma, schreibt Plaene und stellt Mitarbeiter ein
+- Ein **Engineer-Agent** programmiert Software
+- Jeder Agent hat ein Budget, eine Rolle und Aufgaben
+
+Das Ganze laeuft auf einem Server im Internet (einem "VPS"), damit die Agenten rund um die Uhr arbeiten koennen — auch wenn dein Computer aus ist.
+
+**Links:**
 - Website: https://paperclip.ing
 - Dokumentation: https://docs.paperclip.ing
-- GitHub: https://github.com/paperclipai/paperclip
-- Lizenz: MIT (Open Source)
+- Quellcode: https://github.com/paperclipai/paperclip (kostenlos, Open Source)
+
+---
+
+## Was du brauchst (Einkaufsliste)
+
+Bevor es losgeht, brauchst du drei Dinge:
+
+### 1. Einen VPS (virtueller Server)
+
+Ein VPS ist ein Computer im Internet, den du mietest. Anbieter sind z.B.:
+- **Hostinger** (ab ca. 5 EUR/Monat) — https://www.hostinger.de
+- **Hetzner** (ab ca. 4 EUR/Monat) — https://www.hetzner.com
+- **DigitalOcean** (ab ca. 6 USD/Monat) — https://www.digitalocean.com
+
+**Beim Bestellen waehle:**
+- Betriebssystem: **Ubuntu 24.04**
+- RAM: mindestens **2 GB** (4 GB empfohlen)
+- Speicher: mindestens **20 GB**
+
+Nach der Bestellung bekommst du:
+- Eine **IP-Adresse** (z.B. `123.45.67.89`)
+- Einen **Benutzernamen** (meistens `root`)
+- Ein **Passwort**
+
+Schreib dir diese drei Dinge auf — du brauchst sie gleich.
+
+### 2. Ein Claude-Abo (Max oder API)
+
+Die KI-Agenten in Paperclip brauchen ein "Gehirn". Dafuer nutzen wir Claude von Anthropic.
+
+**Option A — Claude Max-Abo (empfohlen):**
+- Kostet ca. 100 USD/Monat (Flatrate, keine Extra-Kosten)
+- Abschliessen unter: https://claude.ai
+- Du brauchst dort auch **Claude Code** installiert auf deinem Computer
+
+**Option B — Anthropic API-Key:**
+- Bezahlung nach Verbrauch
+- API-Key erstellen unter: https://console.anthropic.com
+
+### 3. Ein Terminal-Programm
+
+Ein Terminal ist ein Fenster, in das du Befehle tippst. Klingt altmodisch, ist aber der einfachste Weg einen Server zu steuern.
+
+- **Mac:** Das Programm "Terminal" ist vorinstalliert. Oeffne es ueber Spotlight (Cmd + Leertaste, dann "Terminal" tippen).
+- **Windows:** Lade "Windows Terminal" aus dem Microsoft Store oder nutze "PowerShell" (vorinstalliert).
+- **Linux:** Terminal ist vorinstalliert.
+
+---
 
 ## Inhalt
 
-- [Voraussetzungen](#voraussetzungen)
-- [Teil 1: Paperclip installieren](#teil-1-paperclip-installieren)
-- [Teil 2: systemd-Service einrichten](#teil-2-paperclip-als-systemd-service-einrichten)
-- [Teil 3: Firewall konfigurieren](#teil-3-firewall-konfigurieren)
-- [Teil 4: Claude Code Auth (Max-Abo)](#teil-4-claude-code-auth-einrichten-max-abo)
-- [Teil 5: Benutzerverwaltung](#teil-5-erster-login-und-benutzerverwaltung)
-- [Teil 6: Push-Benachrichtigungen](#teil-6-push-benachrichtigungen-einrichten-optional)
-- [Teil 7: Wartung & Troubleshooting](#teil-7-wartung-und-troubleshooting)
+| Teil | Thema | Dauer |
+|------|-------|-------|
+| [Teil 1](#teil-1-mit-dem-server-verbinden) | Mit dem Server verbinden | 5 Min |
+| [Teil 2](#teil-2-den-server-vorbereiten) | Den Server vorbereiten | 10 Min |
+| [Teil 3](#teil-3-paperclip-installieren) | Paperclip installieren | 10 Min |
+| [Teil 4](#teil-4-paperclip-dauerhaft-laufen-lassen) | Paperclip dauerhaft laufen lassen | 5 Min |
+| [Teil 5](#teil-5-firewall-einrichten) | Firewall einrichten | 5 Min |
+| [Teil 6](#teil-6-claude-code-mit-paperclip-verbinden) | Claude Code verbinden | 10 Min |
+| [Teil 7](#teil-7-im-browser-anmelden) | Im Browser anmelden | 5 Min |
+| [Teil 8](#teil-8-push-benachrichtigungen-optional) | Push-Benachrichtigungen (optional) | 10 Min |
+| [Teil 9](#teil-9-wartung-und-problemloesung) | Wartung und Problemloesung | Nachschlagewerk |
 
 ---
 
-## Voraussetzungen
+## Teil 1: Mit dem Server verbinden
 
-| Was | Minimum |
-|-----|---------|
-| **VPS** | Ubuntu 22.04+ oder Debian 12+, mindestens 2 GB RAM, 20 GB Disk |
-| **Node.js** | Version 20 oder hoeher |
-| **Claude Max-Abo** | Fuer Claude Code als Agent-Runtime (alternativ: Anthropic API-Key) |
-| **SSH-Zugang** | Root-Zugang auf den VPS |
+### Was passiert hier?
 
----
+Du verbindest dich von deinem Computer aus mit dem gemieteten Server. Das nennt man eine "SSH-Verbindung" — eine verschluesselte Leitung zwischen deinem Computer und dem Server.
 
-## Teil 1: Paperclip installieren
+### So geht's
 
-### 1.1 Mit dem VPS verbinden
+1. Oeffne das **Terminal** auf deinem Computer
+2. Tippe folgenden Befehl ein (ersetze die Platzhalter durch deine echten Daten):
 
 ```bash
-ssh root@DEINE-IP
+ssh root@DEINE-IP-ADRESSE
 ```
 
-### 1.2 System aktualisieren und Node.js installieren
+Beispiel: Wenn deine IP `123.45.67.89` ist, tippst du:
+```bash
+ssh root@123.45.67.89
+```
+
+3. Beim ersten Mal fragt das Terminal: `Are you sure you want to continue connecting?` — Tippe `yes` und druecke Enter.
+
+4. Gib dein **Passwort** ein. Wichtig: Beim Tippen werden **keine Zeichen angezeigt** — das ist normal und ein Sicherheitsfeature. Einfach blind tippen und Enter druecken.
+
+### Checkpoint
+
+Du siehst jetzt etwas wie:
+```
+root@server:~#
+```
+Das bedeutet: Du bist auf dem Server eingeloggt. Alles was du jetzt tippst, passiert auf dem Server, nicht auf deinem Computer.
+
+> **Tipp:** Um die Verbindung zu beenden, tippe `exit` und druecke Enter. Du kannst dich jederzeit erneut verbinden.
+
+---
+
+## Teil 2: Den Server vorbereiten
+
+### Was passiert hier?
+
+Wir installieren die Software, die Paperclip zum Laufen braucht. Das ist wie das Einrichten eines neuen Computers — Betriebssystem aktualisieren, Programme installieren.
+
+### Schritt 1: System aktualisieren
+
+Dieser Befehl aktualisiert alle Programme auf dem Server auf die neueste Version:
 
 ```bash
 apt update && apt upgrade -y
-
-# Node.js 20 installieren (falls noch nicht vorhanden)
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
-
-# Version pruefen
-node -v   # sollte v20.x.x zeigen
-npm -v    # sollte 10.x.x zeigen
 ```
 
-### 1.3 Paperclip-Benutzer anlegen
+Das kann ein paar Minuten dauern. Warte bis wieder `root@server:~#` erscheint.
 
-Paperclip sollte nicht als root laufen. Wir erstellen einen eigenen System-User:
+### Schritt 2: Node.js installieren
+
+Node.js ist die Programmierumgebung, in der Paperclip laeuft. Vergleichbar mit Java fuer andere Programme.
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+```
+
+### Schritt 3: PostgreSQL-Client installieren
+
+Paperclip speichert Daten in einer Datenbank. Wir installieren ein Werkzeug, um spaeter in die Datenbank schauen zu koennen:
+
+```bash
+apt install -y postgresql-client-16
+```
+
+### Checkpoint
+
+Pruefe ob alles installiert ist:
+
+```bash
+node -v
+npm -v
+```
+
+Du solltest Versionsnummern sehen, z.B. `v20.20.0` und `10.8.2`. Die genauen Zahlen koennen abweichen — wichtig ist, dass keine Fehlermeldung kommt.
+
+---
+
+## Teil 3: Paperclip installieren
+
+### Was passiert hier?
+
+Wir erstellen einen eigenen Benutzer fuer Paperclip (aus Sicherheitsgruenden) und installieren dann die Software.
+
+### Schritt 1: Paperclip-Benutzer anlegen
+
+Aus Sicherheitsgruenden sollte Paperclip nicht als "root" (Administrator) laufen. Wir erstellen einen eigenen Benutzer:
 
 ```bash
 adduser --system --group --home /home/paperclip --shell /bin/bash paperclip
 ```
 
-### 1.4 Paperclip installieren und einrichten
+### Schritt 2: Paperclip installieren
+
+Jetzt installieren wir Paperclip. Der folgende Befehl laedt alles herunter und richtet es ein:
 
 ```bash
-# Als paperclip-User das Setup starten
 sudo -u paperclip bash -c 'cd /home/paperclip && npx paperclipai onboard --yes'
 ```
 
-Das Setup erstellt automatisch:
-- Eine eingebettete PostgreSQL-Datenbank
-- Die Konfiguration unter `/home/paperclip/.paperclip/instances/default/`
-- Einen CEO-Agent als ersten KI-Mitarbeiter
+> **Was bedeutet `sudo -u paperclip`?** Damit sagen wir dem Server: "Fuehre den folgenden Befehl als Benutzer 'paperclip' aus, nicht als root."
 
-### 1.5 Konfiguration anpassen
+Das dauert ein paar Minuten. Paperclip erstellt dabei automatisch:
+- Eine Datenbank fuer alle Daten
+- Eine Konfigurationsdatei
+- Einen CEO-Agent (deinen ersten KI-Mitarbeiter)
 
-Die Konfigurationsdatei liegt unter:
-```
-/home/paperclip/.paperclip/instances/default/config.json
-```
+### Schritt 3: Konfiguration anpassen
 
-Oeffne sie und stelle sicher, dass folgende Werte gesetzt sind:
+Jetzt muessen wir Paperclip sagen, dass es von ueberall erreichbar sein soll (nicht nur vom Server selbst). Oeffne die Konfigurationsdatei:
 
 ```bash
 nano /home/paperclip/.paperclip/instances/default/config.json
 ```
 
-**Wichtige Einstellungen:**
+> **Was ist `nano`?** Ein einfacher Texteditor im Terminal. Du kannst darin mit den Pfeiltasten navigieren.
+
+Suche den Bereich `"server"` und stelle sicher, dass dort steht:
 
 ```json
-{
-  "server": {
+"server": {
     "deploymentMode": "authenticated",
     "exposure": "public",
     "host": "0.0.0.0",
     "port": 3100,
     "serveUi": true
-  },
-  "auth": {
-    "baseUrlMode": "explicit",
-    "publicBaseUrl": "http://DEINE-IP:3100",
-    "disableSignUp": false
-  }
 }
 ```
 
-> **Wichtig:** `host` muss `"0.0.0.0"` sein, damit die App von aussen erreichbar ist. Bei `"127.0.0.1"` waere sie nur lokal zugaenglich.
+Suche dann den Bereich `"auth"` und aendere ihn zu:
 
-> **Wichtig:** `baseUrlMode` muss `"explicit"` sein und `publicBaseUrl` muss gesetzt werden, wenn `deploymentMode` auf `"authenticated"` und `exposure` auf `"public"` steht. Sonst startet Paperclip nicht.
+```json
+"auth": {
+    "baseUrlMode": "explicit",
+    "publicBaseUrl": "http://DEINE-IP-ADRESSE:3100",
+    "disableSignUp": false
+}
+```
+
+> **Wichtig:** Ersetze `DEINE-IP-ADRESSE` durch die echte IP deines Servers (z.B. `http://123.45.67.89:3100`).
+
+**Speichern und schliessen:**
+1. Druecke `Strg + O` (das ist der Buchstabe O, nicht Null), dann Enter zum Speichern
+2. Druecke `Strg + X` zum Schliessen
+
+### Checkpoint
+
+Pruefe ob die Konfiguration gueltig ist:
+
+```bash
+sudo -u paperclip npx paperclipai doctor
+```
+
+Du solltest `1 passed, 0 failed` sehen. Falls Fehler angezeigt werden, pruefe nochmal die Konfigurationsdatei — meistens fehlt ein Komma oder Anfuehrungszeichen.
 
 ---
 
-## Teil 2: Paperclip als systemd-Service einrichten
+## Teil 4: Paperclip dauerhaft laufen lassen
 
-Damit Paperclip automatisch nach einem Neustart des Servers wieder laeuft:
+### Was passiert hier?
 
-### 2.1 Service-Datei erstellen
+Wenn du Paperclip einfach nur startest und dann das Terminal schliesst, stoppt es wieder. Wir richten es so ein, dass es:
+- Automatisch startet wenn der Server hochfaehrt
+- Sich selbst neu startet wenn es abstuerzt
+
+Das nennt man einen "systemd-Service".
+
+### Schritt 1: Service-Datei erstellen
+
+Kopiere den folgenden Block komplett und fuege ihn ins Terminal ein:
 
 ```bash
 cat > /etc/systemd/system/paperclip.service << 'EOF'
@@ -143,7 +280,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
-### 2.2 Service aktivieren und starten
+### Schritt 2: Service aktivieren und starten
 
 ```bash
 systemctl daemon-reload
@@ -151,201 +288,315 @@ systemctl enable paperclip
 systemctl start paperclip
 ```
 
-### 2.3 Pruefen ob alles laeuft
+> - `daemon-reload` = dem System sagen, dass es eine neue Service-Datei gibt
+> - `enable` = beim Serverstart automatisch mitstarten
+> - `start` = jetzt sofort starten
+
+### Schritt 3: Warten und pruefen
+
+Warte ca. 10 Sekunden, dann pruefe:
 
 ```bash
-# Status anzeigen
 systemctl status paperclip
-
-# Port pruefen (sollte 0.0.0.0:3100 zeigen)
-ss -tlnp | grep 3100
-
-# Logs ansehen
-journalctl -u paperclip -f
 ```
 
-### 2.4 Wichtige Service-Befehle
+Du solltest `active (running)` in gruener Schrift sehen.
 
-| Befehl | Was es tut |
-|--------|-----------|
-| `systemctl start paperclip` | Starten |
-| `systemctl stop paperclip` | Stoppen |
-| `systemctl restart paperclip` | Neustarten |
-| `systemctl status paperclip` | Status anzeigen |
-| `journalctl -u paperclip -f` | Logs live verfolgen |
+Pruefe auch, ob der Port offen ist:
+
+```bash
+ss -tlnp | grep 3100
+```
+
+Du solltest eine Zeile sehen die `0.0.0.0:3100` enthaelt. Das bedeutet: Paperclip laeuft und ist bereit fuer Verbindungen von ueberall.
+
+### Checkpoint
+
+| Was du siehst | Bedeutung |
+|---------------|-----------|
+| `active (running)` | Alles in Ordnung |
+| `failed` | Etwas stimmt nicht — pruefe die Logs mit `journalctl -u paperclip -f` |
+| Keine Ausgabe bei `ss` | Paperclip laeuft nicht oder hoert auf dem falschen Port |
+
+### Nuetzliche Befehle fuer spaeter
+
+| Was du willst | Befehl |
+|---------------|--------|
+| Status anzeigen | `systemctl status paperclip` |
+| Stoppen | `systemctl stop paperclip` |
+| Neustarten | `systemctl restart paperclip` |
+| Live-Logs ansehen | `journalctl -u paperclip -f` |
+
+> **Tipp:** Bei den Live-Logs druecke `Strg + C` um wieder rauszukommen.
 
 ---
 
-## Teil 3: Firewall konfigurieren
+## Teil 5: Firewall einrichten
 
-### 3.1 UFW (Ubuntu Firewall)
+### Was passiert hier?
+
+Eine Firewall schuetzt deinen Server, indem sie nur bestimmte Verbindungen durchlaesst. Wir oeffnen zwei "Tueren":
+- Port 22 fuer SSH (damit du dich weiterhin verbinden kannst)
+- Port 3100 fuer Paperclip (damit du es im Browser oeffnen kannst)
+
+### Schritt 1: Ports freigeben
 
 ```bash
-ufw allow 22/tcp      # SSH nicht aussperren!
-ufw allow 3100/tcp    # Paperclip
+ufw allow 22/tcp
+ufw allow 3100/tcp
 ufw enable
 ```
 
-### 3.2 Hostinger-Firewall
+Bei der Frage `Command may disrupt existing SSH connections. Proceed with operation?` tippe `y` und druecke Enter.
 
-Falls du einen Hostinger-VPS nutzt: Im **Hostinger Panel** unter **VPS > Firewall** muss Port 3100 ebenfalls freigegeben sein. Hostinger hat eine eigene Firewall-Schicht die unabhaengig von UFW laeuft.
+### Schritt 2: Hostinger/Provider-Firewall (wichtig!)
 
-### 3.3 Erreichbarkeit testen
+Viele VPS-Anbieter haben **zusaetzlich** eine eigene Firewall in ihrem Web-Panel. Diese ist unabhaengig von der Firewall auf dem Server selbst.
 
-Von deinem lokalen Rechner:
+**Bei Hostinger:**
+1. Logge dich im Hostinger-Panel ein
+2. Gehe zu VPS > dein Server > Firewall
+3. Fuege eine Regel hinzu: Port `3100`, Protokoll `TCP`, Erlauben
+
+**Bei Hetzner:**
+1. Gehe in die Hetzner Cloud Console
+2. Firewalls > Regel hinzufuegen: Port `3100`, TCP, Eingehend
+
+**Bei DigitalOcean:**
+1. Networking > Firewalls
+2. Inbound Rule: Port `3100`, TCP
+
+### Checkpoint
+
+Oeffne auf deinem Computer ein **neues Terminal-Fenster** (nicht das auf dem Server!) und tippe:
+
 ```bash
-curl -s http://DEINE-IP:3100/api/health
+curl -s http://DEINE-IP-ADRESSE:3100/api/health
 ```
 
-Erwartete Antwort:
-```json
-{"status":"ok","version":"...","deploymentMode":"authenticated",...}
-```
+Du solltest eine Antwort sehen die mit `{"status":"ok"` beginnt. Damit ist Paperclip von aussen erreichbar!
+
+Falls du eine Fehlermeldung bekommst oder nichts passiert:
+- `Connection refused` = Paperclip laeuft nicht (zurueck zu Teil 4)
+- `Connection timed out` = Firewall blockiert (pruefe beide Firewalls nochmal)
 
 ---
 
-## Teil 4: Claude Code Auth einrichten (Max-Abo)
+## Teil 6: Claude Code mit Paperclip verbinden
 
-Mit einem Claude Max-Abo kannst du Claude Code als Agent-Runtime nutzen — ohne zusaetzliche API-Kosten.
+### Was passiert hier?
 
-### 4.1 Claude Code CLI installieren
+Die Agenten in Paperclip brauchen ein KI-Modell als "Gehirn". Wir verbinden Paperclip mit Claude, damit die Agenten denken und arbeiten koennen. Wenn du ein Claude Max-Abo hast, kostet das nichts extra.
 
+### Variante A: Mit Claude Max-Abo (empfohlen)
+
+#### Schritt 1: Claude Code auf deinem Computer installieren
+
+Falls noch nicht geschehen — auf deinem **lokalen Computer** (nicht auf dem Server!):
+
+**Mac:**
 ```bash
 npm install -g @anthropic-ai/claude-code
 ```
 
-### 4.2 Authentifizierung einrichten
+**Windows (in PowerShell als Administrator):**
+```bash
+npm install -g @anthropic-ai/claude-code
+```
 
-Auf einem VPS ohne Desktop/Browser funktioniert `claude auth login` nicht direkt (das Terminal friert ein). Stattdessen nutzen wir den **Credential-Transfer** vom lokalen Rechner.
+#### Schritt 2: Claude Code auf deinem Computer einloggen
 
-#### Schritt 1: Auf dem lokalen Mac/PC einloggen
-
-Falls noch nicht geschehen, auf deinem lokalen Rechner:
+Auf deinem **lokalen Computer**:
 
 ```bash
 claude auth login
 ```
 
-Browser oeffnet sich, mit deinem Claude-Account anmelden.
+Dein Browser oeffnet sich. Melde dich mit deinem Claude-Account an und genehmige den Zugang.
 
-#### Schritt 2: Credentials vom Mac exportieren
+#### Schritt 3: Claude Code auf dem Server installieren
 
-Auf dem Mac werden die Credentials im Keychain gespeichert. So holst du sie raus:
+Jetzt auf dem **Server** (ueber SSH):
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+#### Schritt 4: Zugangsdaten vom Computer auf den Server kopieren
+
+Auf einem Server ohne Browser funktioniert der normale Login nicht. Deshalb kopieren wir die Zugangsdaten von deinem Computer auf den Server.
+
+**Auf deinem lokalen Computer** (neues Terminal-Fenster oeffnen):
 
 ```bash
 security find-generic-password -s "Claude Code-credentials" -a "$(whoami)" -w > /tmp/claude-credentials.json
 ```
 
-#### Schritt 3: Credentials auf den VPS kopieren
+> Dieser Befehl liest deine Claude-Zugangsdaten aus dem Mac-Schluesselbund und speichert sie in einer temporaeren Datei.
+
+> **Windows-Nutzer:** Auf Windows liegen die Credentials unter `%USERPROFILE%\.claude\.credentials.json`. Kopiere diese Datei direkt.
+
+Jetzt die Datei auf den Server kopieren:
 
 ```bash
-scp /tmp/claude-credentials.json root@DEINE-IP:/home/paperclip/.claude/.credentials.json
+scp /tmp/claude-credentials.json root@DEINE-IP-ADRESSE:/home/paperclip/.claude/.credentials.json
 ```
 
-#### Schritt 4: Berechtigungen setzen
+> `scp` ist wie "Datei kopieren", aber ueber das Internet auf einen anderen Computer.
 
-Auf dem VPS:
+Danach die **temporaere Datei loeschen** (Sicherheit!):
+
+```bash
+rm /tmp/claude-credentials.json
+```
+
+#### Schritt 5: Berechtigungen auf dem Server setzen
+
+Zurueck auf dem **Server** (ueber SSH):
 
 ```bash
 chown paperclip:paperclip /home/paperclip/.claude/.credentials.json
 chmod 600 /home/paperclip/.claude/.credentials.json
 ```
 
-#### Schritt 5: Auth pruefen
+> - `chown` = die Datei gehoert dem paperclip-Benutzer
+> - `chmod 600` = nur der Besitzer darf die Datei lesen (Sicherheit)
+
+#### Schritt 6: Pruefen ob es funktioniert
 
 ```bash
 sudo -u paperclip claude auth status
 ```
 
-Erwartete Ausgabe:
-
+**Erwartete Ausgabe:**
 ```json
 {
   "loggedIn": true,
   "authMethod": "claude.ai",
-  "apiProvider": "firstParty",
   "subscriptionType": "max"
 }
 ```
 
-#### Schritt 6: Lokale Credentials-Datei loeschen
-
-```bash
-rm /tmp/claude-credentials.json
-```
-
-> **Sicherheitshinweis:** Die Credentials-Datei enthaelt OAuth-Tokens. Behandle sie wie ein Passwort. Loesche temporaere Kopien sofort.
+Wenn du `"loggedIn": true` siehst — perfekt! Weiter geht's.
 
 #### Schritt 7: Paperclip neu starten
 
+Damit Paperclip die neue Verbindung nutzt:
+
 ```bash
 systemctl restart paperclip
 ```
 
-### 4.3 Alternative: Anthropic API-Key
+### Variante B: Mit Anthropic API-Key (alternative)
 
-Falls du kein Max-Abo hast, kannst du stattdessen einen API-Key von https://console.anthropic.com verwenden:
+Falls du kein Max-Abo hast, kannst du einen API-Key nutzen. Dieser wird nach Verbrauch abgerechnet.
+
+1. Erstelle einen API-Key unter https://console.anthropic.com
+2. Auf dem Server:
 
 ```bash
-# In die .env-Datei eintragen
-echo 'ANTHROPIC_API_KEY=sk-ant-DEIN-KEY' >> /home/paperclip/.paperclip/instances/default/.env
-
-# Paperclip neustarten
+echo 'ANTHROPIC_API_KEY=DEIN-API-KEY-HIER-EINFUEGEN' >> /home/paperclip/.paperclip/instances/default/.env
 systemctl restart paperclip
 ```
 
-> **Hinweis:** API-Key-Nutzung wird nach Verbrauch abgerechnet. Mit dem Max-Abo (Credential-Transfer) faellt keine zusaetzliche Gebuehr an.
+> Ersetze `DEIN-API-KEY-HIER-EINFUEGEN` durch deinen echten Key (beginnt mit `sk-ant-`).
+
+### Checkpoint
+
+Warte ca. 30 Sekunden nach dem Neustart, dann:
+
+```bash
+systemctl status paperclip
+```
+
+Wenn `active (running)` steht und keine Fehler in den Logs sind (`journalctl -u paperclip --no-pager | tail -5`), ist Claude erfolgreich verbunden.
 
 ---
 
-## Teil 5: Erster Login und Benutzerverwaltung
+## Teil 7: Im Browser anmelden
 
-### 5.1 Im Browser anmelden
+### Was passiert hier?
 
-Oeffne im Browser:
+Paperclip hat eine Weboberflaeche (wie eine Website). Dort siehst du deine KI-Firma, die Agenten und ihre Arbeit.
+
+### Schritt 1: Paperclip im Browser oeffnen
+
+Oeffne deinen Browser (Chrome, Firefox, Safari, ...) und gehe zu:
+
 ```
-http://DEINE-IP:3100
+http://DEINE-IP-ADRESSE:3100
 ```
 
-Erstelle deinen Admin-Account. Beim Onboarding wird automatisch eine Company mit CEO-Agent angelegt.
+Beispiel: `http://123.45.67.89:3100`
 
-### 5.2 Zweiten Benutzer anlegen
+### Schritt 2: Account erstellen
 
-Solange Sign-Up aktiviert ist (`disableSignUp: false`), kann sich jeder mit dem Link registrieren. Teile die URL mit Kollegen die Zugang brauchen.
+Du siehst eine Login-Seite. Klicke auf "Sign Up" und erstelle deinen Account mit E-Mail und Passwort.
 
-### 5.3 Sign-Up deaktivieren
+### Schritt 3: Firma und Ziel anlegen
 
-Wenn alle Benutzer registriert sind, Sign-Up schliessen:
+Nach dem Login wirst du durch ein Onboarding gefuehrt:
+1. Gib deiner Firma einen Namen
+2. Setze ein Ziel (z.B. "Eine Buchhaltungs-App bauen")
+3. Ein CEO-Agent wird automatisch erstellt
+
+### Schritt 4: Zusaetzliche Benutzer einladen
+
+Wenn Kollegen auch Zugang brauchen, schicke ihnen einfach den Link `http://DEINE-IP-ADRESSE:3100`. Sie koennen sich selbst registrieren.
+
+### Schritt 5: Registrierung schliessen
+
+**Wichtig:** Wenn alle Benutzer registriert sind, schliesse die Registrierung. Sonst kann sich jeder mit dem Link anmelden.
+
+Auf dem Server (ueber SSH):
 
 ```bash
-# In der config.json
-sed -i 's/"disableSignUp": false/"disableSignUp": true/' \
-  /home/paperclip/.paperclip/instances/default/config.json
-
-# Paperclip neustarten
+sed -i 's/"disableSignUp": false/"disableSignUp": true/' /home/paperclip/.paperclip/instances/default/config.json
 systemctl restart paperclip
 ```
 
+### Checkpoint
+
+Du siehst im Browser dein Paperclip-Dashboard mit:
+- Deiner Firma
+- Dem CEO-Agent
+- Einem ersten Task ("Hire your first engineer")
+
+Der CEO wird beim naechsten "Heartbeat" (automatischer Aktivierungszyklus, alle 30-60 Minuten) anfangen zu arbeiten — eigenstaendig Plaene schreiben, Mitarbeiter einstellen und Tasks delegieren.
+
 ---
 
-## Teil 6: Push-Benachrichtigungen einrichten (optional)
+## Teil 8: Push-Benachrichtigungen (optional)
 
-Mit Pushover kannst du dich benachrichtigen lassen wenn die Agenten etwas Wichtiges tun.
+### Was passiert hier?
 
-### 6.1 Voraussetzungen
+Du richtest es so ein, dass du eine Nachricht auf dein Handy bekommst, wenn die Agenten etwas Wichtiges tun (z.B. einen neuen Mitarbeiter einstellen oder eine Aufgabe erledigen).
 
-- Pushover-Account (https://pushover.net)
-- Pushover-App erstellen unter https://pushover.net/apps/build
-- Du brauchst: **API Token** und **User Key**
+Dafuer nutzen wir den Dienst **Pushover**.
 
-### 6.2 Notification-Script erstellen
+### Voraussetzungen
 
-Erstelle die Datei `/home/paperclip/paperclip-notify.sh`:
+1. Lade die **Pushover-App** auf dein Handy (iOS oder Android, einmalig ca. 5 EUR)
+2. Erstelle einen Account auf https://pushover.net
+3. Erstelle eine neue App unter https://pushover.net/apps/build (Name z.B. "Paperclip")
+4. Notiere dir:
+   - Deinen **User Key** (auf der Pushover-Startseite)
+   - Den **API Token** (auf der Seite der App die du erstellt hast)
+
+### Schritt 1: Notification-Script erstellen
+
+Auf dem Server (ueber SSH), erstelle eine neue Datei:
+
+```bash
+nano /home/paperclip/paperclip-notify.sh
+```
+
+Fuege folgenden Inhalt ein (ersetze die zwei Platzhalter mit deinen echten Keys):
 
 ```bash
 #!/bin/bash
-PUSHOVER_TOKEN="DEIN-APP-TOKEN"
-PUSHOVER_USER="DEIN-USER-KEY"
+PUSHOVER_TOKEN="DEIN-APP-TOKEN-HIER"
+PUSHOVER_USER="DEIN-USER-KEY-HIER"
 STATE_FILE="/home/paperclip/.paperclip-notify-last"
 DB_CMD="PGPASSWORD=paperclip psql -h 127.0.0.1 -p 54329 -U paperclip -d paperclip -t -A"
 
@@ -374,97 +625,149 @@ fi
 date -u +"%Y-%m-%d %H:%M:%S" > "$STATE_FILE"
 ```
 
-### 6.3 Script einrichten
+Speichern mit `Strg + O`, Enter, dann `Strg + X`.
+
+### Schritt 2: Script ausfuehrbar machen
 
 ```bash
 chmod +x /home/paperclip/paperclip-notify.sh
 chown paperclip:paperclip /home/paperclip/paperclip-notify.sh
 ```
 
-### 6.4 Cronjob einrichten (alle 5 Minuten)
+### Schritt 3: Automatisch alle 5 Minuten ausfuehren
+
+Wir richten einen sogenannten "Cronjob" ein — das ist wie ein Wecker, der alle 5 Minuten das Script ausfuehrt:
 
 ```bash
 (crontab -u paperclip -l 2>/dev/null; echo "*/5 * * * * /home/paperclip/paperclip-notify.sh") | crontab -u paperclip -
 ```
 
-### 6.5 Testen
+### Checkpoint
+
+Teste ob es funktioniert:
 
 ```bash
 sudo -u paperclip /home/paperclip/paperclip-notify.sh
 ```
 
-Du solltest eine Push-Nachricht auf deinem Handy bekommen.
+Du solltest innerhalb weniger Sekunden eine Push-Nachricht auf deinem Handy bekommen. Falls nicht:
+- Pruefe deine Pushover-Keys (Tippfehler?)
+- Pruefe ob die Pushover-App auf dem Handy installiert und eingeloggt ist
 
 ---
 
-## Teil 7: Wartung und Troubleshooting
+## Teil 9: Wartung und Problemloesung
 
-### 7.1 Wichtige Pfade
+### Wichtige Pfade auf dem Server
 
-| Was | Pfad |
-|-----|------|
-| Konfiguration | `/home/paperclip/.paperclip/instances/default/config.json` |
+Falls du mal etwas suchen oder pruefen musst — hier liegt alles:
+
+| Was | Wo auf dem Server |
+|-----|-------------------|
+| Paperclip-Konfiguration | `/home/paperclip/.paperclip/instances/default/config.json` |
 | Datenbank | `/home/paperclip/.paperclip/instances/default/db/` |
-| Logs | `/home/paperclip/.paperclip/instances/default/logs/` |
-| Backups | `/home/paperclip/.paperclip/instances/default/data/backups/` |
-| Secrets | `/home/paperclip/.paperclip/instances/default/secrets/master.key` |
-| Claude Credentials | `/home/paperclip/.claude/.credentials.json` |
-| systemd Service | `/etc/systemd/system/paperclip.service` |
-| Notification Script | `/home/paperclip/paperclip-notify.sh` |
+| Log-Dateien | `/home/paperclip/.paperclip/instances/default/logs/` |
+| Automatische Backups | `/home/paperclip/.paperclip/instances/default/data/backups/` |
+| Claude-Zugangsdaten | `/home/paperclip/.claude/.credentials.json` |
+| Service-Konfiguration | `/etc/systemd/system/paperclip.service` |
 
-### 7.2 Nuetzliche CLI-Befehle
+### Nuetzliche Befehle
+
+| Was du wissen willst | Befehl |
+|----------------------|--------|
+| Laeuft Paperclip? | `systemctl status paperclip` |
+| Was machen die Agenten? | Oeffne `http://DEINE-IP:3100` im Browser |
+| Ist Claude verbunden? | `sudo -u paperclip claude auth status` |
+| Automatischer Gesundheitscheck | `sudo -u paperclip npx paperclipai doctor` |
+| Manuelles Backup erstellen | `sudo -u paperclip npx paperclipai db:backup` |
+| Live-Logs anschauen | `journalctl -u paperclip -f` (Beenden mit Strg+C) |
+
+### Problem: "Ich komme nicht auf die Seite im Browser"
+
+1. **Laeuft Paperclip?**
+   ```bash
+   systemctl status paperclip
+   ```
+   Falls `failed` oder `inactive`: `systemctl start paperclip`
+
+2. **Hoert es auf dem richtigen Port?**
+   ```bash
+   ss -tlnp | grep 3100
+   ```
+   Du solltest `0.0.0.0:3100` sehen. Falls `127.0.0.1:3100` steht, aendere `host` in der Config auf `"0.0.0.0"` (siehe Teil 3).
+
+3. **Firewall?**
+   ```bash
+   ufw status
+   ```
+   Port 3100 muss `ALLOW` sein. Pruefe auch die Firewall deines VPS-Anbieters (Teil 5).
+
+### Problem: "Die Agenten machen nichts"
+
+Die Agenten werden durch "Heartbeats" geweckt — das passiert automatisch alle 30-60 Minuten. Habe etwas Geduld nach dem ersten Start.
+
+Falls nach einer Stunde nichts passiert:
+1. Pruefe ob Claude verbunden ist:
+   ```bash
+   sudo -u paperclip claude auth status
+   ```
+   Wenn `"loggedIn": false` — wiederhole Teil 6.
+
+2. Pruefe die Logs auf Fehler:
+   ```bash
+   journalctl -u paperclip --no-pager | tail -20
+   ```
+
+### Problem: "Claude-Zugangsdaten abgelaufen"
+
+Die Zugangsdaten laufen nach einiger Zeit ab. Wenn die Agenten ploetzlich nicht mehr arbeiten:
+
+1. Auf deinem **lokalen Computer** neu einloggen:
+   ```bash
+   claude auth login
+   ```
+
+2. Credentials erneut exportieren und hochladen:
+   ```bash
+   security find-generic-password -s "Claude Code-credentials" -a "$(whoami)" -w > /tmp/claude-credentials.json
+   scp /tmp/claude-credentials.json root@DEINE-IP-ADRESSE:/home/paperclip/.claude/.credentials.json
+   rm /tmp/claude-credentials.json
+   ```
+
+3. Auf dem Server Berechtigungen setzen und neustarten:
+   ```bash
+   chown paperclip:paperclip /home/paperclip/.claude/.credentials.json
+   chmod 600 /home/paperclip/.claude/.credentials.json
+   systemctl restart paperclip
+   ```
+
+### Problem: "Paperclip startet nicht (Doctor-Fehler)"
 
 ```bash
-# Health-Check
 sudo -u paperclip npx paperclipai doctor
-
-# Konfiguration aendern
-sudo -u paperclip npx paperclipai configure
-
-# Claude Auth Status pruefen
-sudo -u paperclip claude auth status
-
-# Datenbank-Backup manuell erstellen
-sudo -u paperclip npx paperclipai db:backup
 ```
 
-### 7.3 Haeufige Probleme
+Dieser Befehl prueft automatisch alle Einstellungen und sagt dir genau, was falsch ist. Die haeufigsten Ursachen:
+- `publicBaseUrl` fehlt in der Config → Siehe Teil 3, Schritt 3
+- `baseUrlMode` steht auf `auto` statt `explicit` → Siehe Teil 3, Schritt 3
 
-#### App ist von aussen nicht erreichbar
+---
 
-1. Pruefen ob der richtige Host gesetzt ist: `grep host config.json` → muss `0.0.0.0` sein
-2. Pruefen ob `publicBaseUrl` gesetzt ist (bei authenticated + public mode)
-3. Firewall pruefen: `ufw status` und Hostinger-Panel
-4. Port pruefen: `ss -tlnp | grep 3100`
+## Geschafft!
 
-#### Prozesse frieren ein (Status T+)
+Wenn du bis hierhin gekommen bist, hast du:
 
-Passiert wenn die Terminal-Session verloren geht. Loesung:
-```bash
-pkill -9 -f "paperclipai run"
-systemctl start paperclip
-```
+- Einen eigenen Server im Internet eingerichtet
+- Paperclip installiert und als dauerhaften Dienst konfiguriert
+- Die Firewall sicher konfiguriert
+- Claude Code als KI-Gehirn fuer deine Agenten verbunden
+- Deinen ersten Account erstellt und die Registrierung gesichert
+- (Optional) Push-Benachrichtigungen auf dein Handy eingerichtet
 
-Deshalb ist der systemd-Service so wichtig — er startet die App automatisch neu.
-
-#### Claude Auth Token abgelaufen
-
-Die OAuth-Tokens haben ein Ablaufdatum. Wenn die Agenten nicht mehr funktionieren:
-
-1. Auf dem lokalen Rechner neu einloggen: `claude auth login`
-2. Credentials erneut exportieren und auf den VPS kopieren (siehe Teil 4)
-3. `systemctl restart paperclip`
-
-#### Doctor-Check schlaegt fehl
-
-```bash
-sudo -u paperclip npx paperclipai doctor
-```
-
-Zeigt dir genau was falsch konfiguriert ist und gibt Hinweise zur Behebung.
+Deine KI-Firma laeuft jetzt rund um die Uhr. Der CEO-Agent wird eigenstaendig Plaene schreiben, Mitarbeiter einstellen und Aufgaben verteilen. Du kannst jederzeit im Browser vorbeischauen und sehen, was passiert — oder dich per Push-Nachricht informieren lassen.
 
 ---
 
 ## Lizenz
 
-Dieses Setup-Guide ist frei nutzbar. Paperclip selbst ist MIT-lizensiert.
+Diese Anleitung ist frei nutzbar und teilbar. Paperclip selbst ist MIT-lizensiert (Open Source).
